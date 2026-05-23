@@ -11,6 +11,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.atmoscope.ui.screens.CityManagementScreen
+import com.example.atmoscope.ui.screens.LoginScreen
 import com.example.atmoscope.ui.screens.MainWeatherScreen
 import com.example.atmoscope.ui.screens.SettingsScreen
 import com.example.atmoscope.ui.screens.SplashScreen
@@ -33,11 +34,28 @@ class MainActivity : ComponentActivity() {
                 ) {
                     composable("splash") {
                         SplashScreen(onFinish = {
-                            navController.navigate("main") {
+                            // Berubah: Setelah splash selesai, arahkan ke login
+                            navController.navigate("login") {
                                 popUpTo("splash") { inclusive = true }
                             }
                         })
                     }
+
+                    // Baru: Halaman Login
+                    composable("login") {
+                        LoginScreen(
+                            onLoginClick = { email, password ->
+                                // Sementara langsung arahkan ke main weather screen
+                                navController.navigate("main") {
+                                    popUpTo("login") { inclusive = true }
+                                }
+                            },
+                            onRegisterClick = {
+                                // TODO: Nanti tambahkan rute register di sini
+                            }
+                        )
+                    }
+
                     composable("main") {
                         MainWeatherScreen(
                             viewModel = viewModel,
