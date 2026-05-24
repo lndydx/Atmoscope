@@ -30,13 +30,31 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
 
     private val prefs = application.getSharedPreferences("atmoscope_prefs", Context.MODE_PRIVATE)
     private val gson = Gson()
+    private val weatherCache = WeatherCache(prefs)
+    val locationManager = AppLocationManager(application)
+
+    private val _lastGpsLocationName = MutableStateFlow(
+        prefs.getString("last_gps_city", "") ?: ""
+    )
+    val lastGpsLocationName: StateFlow<String> = _lastGpsLocationName
+
+    private val _lastGpsDistrictName = MutableStateFlow(
+        prefs.getString("last_gps_district", "") ?: ""
+    )
+    val lastGpsDistrictName: StateFlow<String> = _lastGpsDistrictName
+
+    private val _isDetectingLocation = MutableStateFlow(false)
+    val isDetectingLocation: StateFlow<Boolean> = _isDetectingLocation
 
     // ── State ──────────────────────────────────────────────
     private val _weatherState = MutableStateFlow<UiState<WeatherBundle>>(UiState.Idle)
     val weatherState: StateFlow<UiState<WeatherBundle>> = _weatherState
 
-    private val _selectedCity = MutableStateFlow("Bandung")
+    private val _selectedCity = MutableStateFlow("")
     val selectedCity: StateFlow<String> = _selectedCity
+
+    private val _selectedDistrict = MutableStateFlow("")
+    val selectedDistrict: StateFlow<String> = _selectedDistrict
 
     private val _savedCities = MutableStateFlow<List<String>>(loadSavedCities())
     val savedCities: StateFlow<List<String>> = _savedCities
@@ -49,6 +67,20 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
 
     private val _isAstroMode = MutableStateFlow(false)
     val isAstroMode: StateFlow<Boolean> = _isAstroMode
+
+    // GPS state
+    private val _isUsingGps = MutableStateFlow(prefs.getBoolean("is_using_gps", true))
+    val isUsingGps: StateFlow<Boolean> = _isUsingGps
+
+    private val _isGpsLocation = MutableStateFlow(false)
+    val isGpsLocation: StateFlow<Boolean> = _isGpsLocation
+
+    // Cache info
+    private val _cacheTimestamp = MutableStateFlow<Long?>(null)
+    val cacheTimestamp: StateFlow<Long?> = _cacheTimestamp
+
+    private val _isFromCache = MutableStateFlow(false)
+    val isFromCache: StateFlow<Boolean> = _isFromCache
 
     // ── Kota Indonesia ─────────────────────────────────────
     val cities = mapOf(
@@ -100,12 +132,76 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
     )
 
     init {
-        fetchWeather("Bandung")
+        // Tidak auto-fetch di init, biarkan MainActivity yang handle setelah permission
+        // Tapi load cache dulu kalau ada
+        val cached = weatherCache.load()
+        if (cached != null) {
+            _weatherState.value = UiState.Success(cached.bundle)
+            _selectedCity.value = cached.cityName
+            _selectedDistrict.value = cached.districtName
+            _isGpsLocation.value = cached.isGpsLocation
+            _cacheTimestamp.value = cached.timestamp
+            _isFromCache.value = true
+        }
+    }
+
+    // Dipanggil dari MainActivity setelah permission granted
+    fun initWithGps() {
+        viewModelScope.launch {
+            _isDetectingLocation.value = true
+            _selectedCity.value = "Mendeteksi lokasi..."
+            _selectedDistrict.value = ""
+            _weatherState.value = UiState.Loading
+
+            val loc = locationManager.getCurrentLocation()
+            _isDetectingLocation.value = false
+
+            if (loc != null) {
+                _selectedCity.value = loc.cityName
+                _selectedDistrict.value = loc.districtName
+                _isGpsLocation.value = true
+                saveLastGpsLocation(loc.cityName, loc.districtName)
+                fetchWeatherByCoords(loc.latitude, loc.longitude, loc.timezone)
+            } else {
+                val cached = weatherCache.load()
+                if (cached != null) {
+                    _weatherState.value = UiState.Success(cached.bundle)
+                    _selectedCity.value = cached.cityName
+                    _selectedDistrict.value = cached.districtName
+                    _isGpsLocation.value = cached.isGpsLocation
+                    _cacheTimestamp.value = cached.timestamp
+                    _isFromCache.value = true
+                } else {
+                    _weatherState.value = UiState.Idle
+                    _selectedCity.value = ""
+                }
+            }
+        }
+    }
+
+    // Dipanggil kalau user tolak permission
+    fun initWithoutGps() {
+        setUsingGps(false)
+        val cached = weatherCache.load()
+        if (cached != null) {
+            _weatherState.value = UiState.Success(cached.bundle)
+            _selectedCity.value = cached.cityName
+            _selectedDistrict.value = cached.districtName
+            _isGpsLocation.value = cached.isGpsLocation
+            _cacheTimestamp.value = cached.timestamp
+            _isFromCache.value = true
+        } else {
+            _weatherState.value = UiState.Idle
+        }
     }
 
     fun fetchWeather(cityName: String) {
         val city = cities[cityName] ?: return
+        // User memilih manual → nonaktifkan GPS flag
+        setUsingGps(false)
+        _isGpsLocation.value = false
         _selectedCity.value = cityName
+        _selectedDistrict.value = ""
         _weatherState.value = UiState.Loading
 
         viewModelScope.launch {
@@ -124,16 +220,117 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                         timezone = city.timezone
                     )
                 }
-                _weatherState.value = UiState.Success(
-                    WeatherBundle(
-                        forecast = forecastDeferred.await(),
-                        airQuality = airQualityDeferred.await()
+                val bundle = WeatherBundle(
+                    forecast = forecastDeferred.await(),
+                    airQuality = airQualityDeferred.await()
+                )
+                _weatherState.value = UiState.Success(bundle)
+                _isFromCache.value = false
+                _cacheTimestamp.value = null
+
+                // Simpan ke cache
+                weatherCache.save(
+                    CachedWeather(
+                        bundle = bundle,
+                        cityName = cityName,
+                        districtName = "",
+                        timestamp = System.currentTimeMillis(),
+                        isGpsLocation = false
                     )
                 )
             } catch (e: Exception) {
+                // Coba fallback ke cache
+                val cached = weatherCache.load()
+                if (cached != null) {
+                    _weatherState.value = UiState.Success(cached.bundle)
+                    _cacheTimestamp.value = cached.timestamp
+                    _isFromCache.value = true
+                } else {
+                    _weatherState.value = UiState.Error("Gagal mengambil data: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private suspend fun fetchWeatherByCoords(lat: Double, lon: Double, timezone: String) {
+        try {
+            val bundle = kotlinx.coroutines.coroutineScope {
+                val forecastDeferred = async {
+                    RetrofitInstance.weatherApi.getForecast(
+                        latitude = lat,
+                        longitude = lon,
+                        timezone = timezone
+                    )
+                }
+                val airQualityDeferred = async {
+                    RetrofitInstance.airQualityApi.getAirQuality(
+                        latitude = lat,
+                        longitude = lon,
+                        timezone = timezone
+                    )
+                }
+                WeatherBundle(
+                    forecast = forecastDeferred.await(),
+                    airQuality = airQualityDeferred.await()
+                )
+            }
+            _weatherState.value = UiState.Success(bundle)
+            _isFromCache.value = false
+            _cacheTimestamp.value = null
+
+            weatherCache.save(
+                CachedWeather(
+                    bundle = bundle,
+                    cityName = _selectedCity.value,
+                    districtName = _selectedDistrict.value,
+                    timestamp = System.currentTimeMillis(),
+                    isGpsLocation = true
+                )
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("AtmoscopeDebug", "fetchWeatherByCoords FAILED: ${e.message}", e)
+            val cached = weatherCache.load()
+            if (cached != null) {
+                _weatherState.value = UiState.Success(cached.bundle)
+                _cacheTimestamp.value = cached.timestamp
+                _isFromCache.value = true
+            } else {
                 _weatherState.value = UiState.Error("Gagal mengambil data: ${e.message}")
             }
         }
+    }
+
+    fun enableGpsMode() {
+        setUsingGps(true)
+        viewModelScope.launch {
+            _isDetectingLocation.value = true
+            _selectedCity.value = "Mendeteksi lokasi..."
+            _selectedDistrict.value = ""
+            _weatherState.value = UiState.Loading
+
+            val loc = locationManager.getCurrentLocation()
+            _isDetectingLocation.value = false
+
+            if (loc != null) {
+                _selectedCity.value = loc.cityName
+                _selectedDistrict.value = loc.districtName
+                _isGpsLocation.value = true
+                saveLastGpsLocation(loc.cityName, loc.districtName)
+                fetchWeatherByCoords(loc.latitude, loc.longitude, loc.timezone)
+            } else {
+                _weatherState.value = UiState.Error("Tidak dapat mendeteksi lokasi")
+                _selectedCity.value = ""
+            }
+        }
+    }
+
+    private fun saveLastGpsLocation(city: String, district: String) {
+        _lastGpsLocationName.value = city
+        _lastGpsDistrictName.value = district
+        prefs.edit()
+            .putString("last_gps_city", city)
+            .putString("last_gps_district", district)
+            .apply()
     }
 
     fun addCity(name: String) {
@@ -156,6 +353,16 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
     fun toggleTheme() { _isDarkTheme.value = !_isDarkTheme.value }
     fun setTempUnit(unit: String) { _tempUnit.value = unit }
     fun toggleAstroMode() { _isAstroMode.value = !_isAstroMode.value }
+
+    private fun setUsingGps(value: Boolean) {
+        _isUsingGps.value = value
+        prefs.edit().putBoolean("is_using_gps", value).apply()
+    }
+
+    fun getCacheAgeString(): String {
+        val ts = _cacheTimestamp.value ?: return ""
+        return weatherCache.getAgeString(ts)
+    }
 
     fun convertTemp(celsius: Double): String {
         return when (_tempUnit.value) {

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.example.atmoscope.ui.theme.Purple
 import com.example.atmoscope.ui.theme.PurpleLight
 import com.example.atmoscope.viewmodel.WeatherViewModel
+import androidx.compose.foundation.BorderStroke
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,6 +31,8 @@ fun CityManagementScreen(
 ) {
     val isDark by viewModel.isDarkTheme.collectAsState()
     val savedCities by viewModel.savedCities.collectAsState()
+    val lastGpsCity by viewModel.lastGpsLocationName.collectAsState()
+    val lastGpsDistrict by viewModel.lastGpsDistrictName.collectAsState()
     val allCities = viewModel.cities.keys.toList()
 
     val bgColor = if (isDark) Color(0xFF0D1117) else Color(0xFFE8EDF5)
@@ -63,8 +66,22 @@ fun CityManagementScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            // ── GPS Entry — selalu muncul di paling atas ──
+            GpsLocationCard(
+                lastCity = lastGpsCity,
+                lastDistrict = lastGpsDistrict,
+                cardColor = cardColor,
+                textColor = textColor,
+                subTextColor = subTextColor,
+                onClick = {
+                    viewModel.enableGpsMode()
+                    onBack()
+                }
+            )
+
             if (savedCities.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -109,7 +126,6 @@ fun CityManagementScreen(
         }
     }
 
-    // Add City Dialog
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -171,6 +187,65 @@ fun CityManagementScreen(
                 }
             }
         )
+    }
+}
+
+// ── GPS Card ──────────────────────────────────────────────
+@Composable
+fun GpsLocationCard(
+    lastCity: String,
+    lastDistrict: String,
+    cardColor: Color,
+    textColor: Color,
+    subTextColor: Color,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(
+            containerColor = Purple.copy(alpha = 0.15f)
+        ),
+        shape = RoundedCornerShape(14.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        border = BorderStroke(1.dp, PurpleLight.copy(alpha = 0.4f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("📍", fontSize = 24.sp)
+                Column {
+                    Text(
+                        "Lokasi GPS",
+                        fontWeight = FontWeight.Bold,
+                        color = PurpleLight,
+                        fontSize = 16.sp
+                    )
+                    Text(
+                        if (lastCity.isEmpty()) "Tap untuk deteksi lokasi otomatis"
+                        else if (lastDistrict.isEmpty()) lastCity
+                        else "$lastCity · $lastDistrict",
+                        color = subTextColor,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+            Icon(
+                Icons.Default.MyLocation,
+                contentDescription = null,
+                tint = PurpleLight,
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 

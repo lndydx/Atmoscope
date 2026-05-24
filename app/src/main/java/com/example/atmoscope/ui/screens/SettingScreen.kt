@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.example.atmoscope.ui.theme.Purple
 import com.example.atmoscope.ui.theme.PurpleLight
 import com.example.atmoscope.viewmodel.WeatherViewModel
+import androidx.compose.material.icons.filled.LocationOn
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,6 +39,50 @@ fun SettingsScreen(
     val cardColor = if (isDark) Color(0xFF161B22) else Color.White
     val textColor = if (isDark) Color.White else Color(0xFF1A1F2E)
     val subTextColor = if (isDark) Color(0xFF8B949E) else Color(0xFF6B7280)
+
+    // GPS Location
+    val isUsingGps by viewModel.isUsingGps.collectAsState()
+    SettingCard(cardColor = cardColor) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = PurpleLight
+                )
+                Column {
+                    Text("Lokasi Otomatis", fontWeight = FontWeight.Bold, color = textColor)
+                    Text(
+                        if (isUsingGps) "Aktif — GPS" else "Nonaktif — pilih kota manual",
+                        color = subTextColor,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+            Switch(
+                checked = isUsingGps,
+                onCheckedChange = { enabled ->
+                    if (enabled) {
+                        viewModel.enableGpsMode()
+                    } else {
+                        // Nonaktifkan GPS, biarkan city yang sekarang tetap tampil
+                        viewModel.fetchWeather(viewModel.selectedCity.value.ifEmpty { "Bandung" })
+                    }
+                },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = Purple
+                )
+            )
+        }
+    }
 
     Scaffold(
         topBar = {

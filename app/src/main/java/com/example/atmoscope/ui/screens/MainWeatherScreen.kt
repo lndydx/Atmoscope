@@ -185,8 +185,16 @@ fun WeatherPage(
                 .fillMaxSize()
                 .verticalScroll(scrollState)
         ) {
+            val isGpsLocation by viewModel.isGpsLocation.collectAsState()
+            val isFromCache by viewModel.isFromCache.collectAsState()
+            val selectedDistrict by viewModel.selectedDistrict.collectAsState()
+
             WeatherTopBar(
                 city = selectedCity.ifEmpty { "Pilih Kota" },
+                district = selectedDistrict,
+                isGpsLocation = isGpsLocation,
+                isFromCache = isFromCache,
+                cacheAge = viewModel.getCacheAgeString(),
                 onHamburger = onHamburger,
                 onSettings = onSettings
             )
@@ -254,6 +262,10 @@ fun LifeIndexPage(
     ) {
         WeatherTopBar(
             city = "Life Index",
+            district = "",
+            isGpsLocation = false,
+            isFromCache = false,
+            cacheAge = "",
             onHamburger = onHamburger,
             onSettings = onSettings
         )
@@ -470,8 +482,16 @@ fun AstroMainPage(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
+        val isGpsLocation by viewModel.isGpsLocation.collectAsState()
+        val isFromCache by viewModel.isFromCache.collectAsState()
+        val selectedDistrict by viewModel.selectedDistrict.collectAsState()
+
         WeatherTopBar(
             city = selectedCity.ifEmpty { "Pilih Kota" },
+            district = selectedDistrict,
+            isGpsLocation = isGpsLocation,
+            isFromCache = isFromCache,
+            cacheAge = viewModel.getCacheAgeString(),
             onHamburger = onHamburger,
             onSettings = onSettings
         )
@@ -743,6 +763,10 @@ fun AstroEventsPage(onHamburger: () -> Unit, onSettings: () -> Unit) {
     ) {
         WeatherTopBar(
             city = "Astronomy Events",
+            district = "",
+            isGpsLocation = false,
+            isFromCache = false,
+            cacheAge = "",
             onHamburger = onHamburger,
             onSettings = onSettings
         )
@@ -778,28 +802,63 @@ fun AstroEventsPage(onHamburger: () -> Unit, onSettings: () -> Unit) {
 
 // ── SHARED COMPONENTS ─────────────────────────────────────
 @Composable
-fun WeatherTopBar(city: String, onHamburger: () -> Unit, onSettings: () -> Unit) {
-    Row(
+fun WeatherTopBar(
+    city: String,
+    district: String,
+    isGpsLocation: Boolean,
+    isFromCache: Boolean,
+    cacheAge: String,
+    onHamburger: () -> Unit,
+    onSettings: () -> Unit
+) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        Text(
-            city,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            fontSize = 18.sp,
-            modifier = Modifier.weight(1f)
-        )
-        Row {
-            IconButton(onClick = onHamburger) {
-                Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (isGpsLocation) {
+                        Text("📍", fontSize = 14.sp)
+                    }
+                    Text(
+                        city.ifEmpty { "Pilih Kota" },
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 18.sp
+                    )
+                }
+                if (district.isNotEmpty()) {
+                    Text(
+                        district,
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 13.sp
+                    )
+                }
+                if (isFromCache && cacheAge.isNotEmpty()) {
+                    Text(
+                        "Data terakhir diperbarui: $cacheAge",
+                        color = Color(0xFFF59E0B).copy(alpha = 0.9f),
+                        fontSize = 11.sp
+                    )
+                }
             }
-            IconButton(onClick = onSettings) {
-                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+            Row {
+                IconButton(onClick = onHamburger) {
+                    Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                }
+                IconButton(onClick = onSettings) {
+                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                }
             }
         }
     }
