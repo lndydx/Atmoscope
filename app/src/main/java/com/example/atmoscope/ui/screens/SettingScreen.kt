@@ -1,29 +1,26 @@
 package com.example.atmoscope.ui.screens
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.atmoscope.ui.theme.Purple
 import com.example.atmoscope.ui.theme.PurpleLight
 import com.example.atmoscope.viewmodel.WeatherViewModel
-import androidx.compose.material.icons.filled.LocationOn
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,55 +31,14 @@ fun SettingsScreen(
     val isDark by viewModel.isDarkTheme.collectAsState()
     val tempUnit by viewModel.tempUnit.collectAsState()
     val isAstroMode by viewModel.isAstroMode.collectAsState()
+    val isUsingGps by viewModel.isUsingGps.collectAsState()
+    val notifEnabled by viewModel.notifEnabled.collectAsState()
+    val context = LocalContext.current
 
     val bgColor = if (isDark) Color(0xFF0D1117) else Color(0xFFE8EDF5)
     val cardColor = if (isDark) Color(0xFF161B22) else Color.White
     val textColor = if (isDark) Color.White else Color(0xFF1A1F2E)
     val subTextColor = if (isDark) Color(0xFF8B949E) else Color(0xFF6B7280)
-
-    // GPS Location
-    val isUsingGps by viewModel.isUsingGps.collectAsState()
-    SettingCard(cardColor = cardColor) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(
-                    Icons.Default.LocationOn,
-                    contentDescription = null,
-                    tint = PurpleLight
-                )
-                Column {
-                    Text("Lokasi Otomatis", fontWeight = FontWeight.Bold, color = textColor)
-                    Text(
-                        if (isUsingGps) "Aktif — GPS" else "Nonaktif — pilih kota manual",
-                        color = subTextColor,
-                        fontSize = 13.sp
-                    )
-                }
-            }
-            Switch(
-                checked = isUsingGps,
-                onCheckedChange = { enabled ->
-                    if (enabled) {
-                        viewModel.enableGpsMode()
-                    } else {
-                        // Nonaktifkan GPS, biarkan city yang sekarang tetap tampil
-                        viewModel.fetchWeather(viewModel.selectedCity.value.ifEmpty { "Bandung" })
-                    }
-                },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.White,
-                    checkedTrackColor = Purple
-                )
-            )
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -116,9 +72,7 @@ fun SettingsScreen(
                     fontSize = 16.sp
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("C", "F", "K").forEach { unit ->
                         val label = when (unit) {
                             "C" -> "°C Celsius"
@@ -166,7 +120,10 @@ fun SettingsScreen(
                     Switch(
                         checked = isDark,
                         onCheckedChange = { viewModel.toggleTheme() },
-                        colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Purple)
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Purple
+                        )
                     )
                 }
             }
@@ -190,7 +147,8 @@ fun SettingsScreen(
                         Column {
                             Text("Astronomy Mode", fontWeight = FontWeight.Bold, color = textColor)
                             Text(
-                                if (isAstroMode) "Enabled — Sky Score & Events" else "Disabled — Weather Mode",
+                                if (isAstroMode) "Enabled — Sky Score & Events"
+                                else "Disabled — Weather Mode",
                                 color = subTextColor,
                                 fontSize = 13.sp
                             )
@@ -199,7 +157,97 @@ fun SettingsScreen(
                     Switch(
                         checked = isAstroMode,
                         onCheckedChange = { viewModel.toggleAstroMode() },
-                        colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = Purple)
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Purple
+                        )
+                    )
+                }
+            }
+
+            // GPS
+            SettingCard(cardColor = cardColor) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = PurpleLight
+                        )
+                        Column {
+                            Text(
+                                "Lokasi Otomatis (GPS)",
+                                fontWeight = FontWeight.Bold,
+                                color = textColor
+                            )
+                            Text(
+                                if (isUsingGps) "Aktif — GPS"
+                                else "Nonaktif — pilih kota manual",
+                                color = subTextColor,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = isUsingGps,
+                        onCheckedChange = { enabled ->
+                            if (enabled) viewModel.enableGpsMode()
+                            else viewModel.fetchWeather(
+                                viewModel.selectedCity.value.ifEmpty { "Bandung" }
+                            )
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Purple
+                        )
+                    )
+                }
+            }
+
+            // Notifikasi
+            SettingCard(cardColor = cardColor) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Notifications,
+                            contentDescription = null,
+                            tint = PurpleLight
+                        )
+                        Column {
+                            Text(
+                                "Notifikasi Cuaca Ekstrem",
+                                fontWeight = FontWeight.Bold,
+                                color = textColor
+                            )
+                            Text(
+                                if (notifEnabled) "Aktif — notif setiap pukul 06.00"
+                                else "Nonaktif",
+                                color = subTextColor,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = notifEnabled,
+                        onCheckedChange = { viewModel.toggleNotification(context) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Purple
+                        )
                     )
                 }
             }
@@ -210,7 +258,7 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("Atmoscope v1.0", color = subTextColor, fontSize = 13.sp)
                 Text("Weather & Astronomy App", color = subTextColor, fontSize = 13.sp)
-                Text("Powered by Open-Meteo & XGBoost ML", color = subTextColor, fontSize = 13.sp)
+                Text("Powered by Open-Meteo", color = subTextColor, fontSize = 13.sp)
             }
         }
     }

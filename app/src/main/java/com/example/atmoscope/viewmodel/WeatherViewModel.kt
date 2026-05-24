@@ -11,6 +11,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import com.example.atmoscope.notification.NotificationScheduler
 
 sealed class UiState<out T> {
     object Idle : UiState<Nothing>()
@@ -82,6 +83,9 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
     private val _isFromCache = MutableStateFlow(false)
     val isFromCache: StateFlow<Boolean> = _isFromCache
 
+    private val _notifEnabled = MutableStateFlow(prefs.getBoolean("notif_enabled", true))
+    val notifEnabled: StateFlow<Boolean> = _notifEnabled
+
     // ── Kota Indonesia ─────────────────────────────────────
     val cities = mapOf(
         "Banda Aceh"       to CityInfo(5.55,   95.32,  "Asia/Jakarta"),
@@ -132,8 +136,6 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
     )
 
     init {
-        // Tidak auto-fetch di init, biarkan MainActivity yang handle setelah permission
-        // Tapi load cache dulu kalau ada
         val cached = weatherCache.load()
         if (cached != null) {
             _weatherState.value = UiState.Success(cached.bundle)
@@ -145,7 +147,17 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Dipanggil dari MainActivity setelah permission granted
+    fun toggleNotification(context: Context) {
+        val newValue = !_notifEnabled.value
+        _notifEnabled.value = newValue
+        prefs.edit().putBoolean("notif_enabled", newValue).apply()
+        if (newValue) {
+            NotificationScheduler.schedule(context)
+        } else {
+            NotificationScheduler.cancel(context)
+        }
+    }
+
     fun initWithGps() {
         viewModelScope.launch {
             _isDetectingLocation.value = true
@@ -197,12 +209,18 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
 
     fun fetchWeather(cityName: String) {
         val city = cities[cityName] ?: return
-        // User memilih manual → nonaktifkan GPS flag
         setUsingGps(false)
         _isGpsLocation.value = false
         _selectedCity.value = cityName
         _selectedDistrict.value = ""
         _weatherState.value = UiState.Loading
+
+        prefs.edit()
+            .putFloat("last_lat", city.lat.toFloat())
+            .putFloat("last_lon", city.lon.toFloat())
+            .putString("last_timezone", city.timezone)
+            .putString("last_manual_city", cityName)
+            .apply()
 
         viewModelScope.launch {
             try {
@@ -254,6 +272,12 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
 
     private suspend fun fetchWeatherByCoords(lat: Double, lon: Double, timezone: String) {
         try {
+            prefs.edit()
+                .putFloat("last_lat", lat.toFloat())
+                .putFloat("last_lon", lon.toFloat())
+                .putString("last_timezone", timezone)
+                .apply()
+
             val bundle = kotlinx.coroutines.coroutineScope {
                 val forecastDeferred = async {
                     RetrofitInstance.weatherApi.getForecast(
