@@ -36,12 +36,15 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import com.example.atmoscope.viewmodel.AuthViewModel
 
 @Composable
 fun MainWeatherScreen(
     viewModel: WeatherViewModel,
+    authViewModel: AuthViewModel,
     onNavigateToCityManagement: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToLogin: () -> Unit
 ) {
     val isAstroMode by viewModel.isAstroMode.collectAsState()
     val weatherState by viewModel.weatherState.collectAsState()
@@ -75,6 +78,10 @@ fun MainWeatherScreen(
                 weatherState = weatherState,
                 onHamburger = onNavigateToCityManagement,
                 onSettings = onNavigateToSettings,
+                onAstroClick = if (authViewModel.isLoggedIn) {
+                    { viewModel.toggleAstroMode() }
+                } else null,
+                onNavigateToLogin = onNavigateToLogin,
                 selectedCity = selectedCity
             )
         }
@@ -87,6 +94,8 @@ fun WeatherModePager(
     weatherState: UiState<WeatherBundle>,
     onHamburger: () -> Unit,
     onSettings: () -> Unit,
+    onAstroClick: (() -> Unit)?,
+    onNavigateToLogin: () -> Unit,
     selectedCity: String
 ) {
     var currentPage by remember { mutableIntStateOf(0) }
@@ -127,6 +136,8 @@ fun WeatherModePager(
                     weatherState = weatherState,
                     onHamburger = onHamburger,
                     onSettings = onSettings,
+                    onAstroClick = onAstroClick,
+                    onNavigateToLogin = onNavigateToLogin,
                     selectedCity = selectedCity
                 )
                 1 -> LifeIndexPage(
@@ -166,6 +177,8 @@ fun WeatherPage(
     weatherState: UiState<WeatherBundle>,
     onHamburger: () -> Unit,
     onSettings: () -> Unit,
+    onAstroClick: (() -> Unit)?,
+    onNavigateToLogin: () -> Unit,
     selectedCity: String
 ) {
     val scrollState = rememberScrollState()
@@ -196,7 +209,8 @@ fun WeatherPage(
                 isFromCache = isFromCache,
                 cacheAge = viewModel.getCacheAgeString(),
                 onHamburger = onHamburger,
-                onSettings = onSettings
+                onSettings = onSettings,
+                onAstroClick = onAstroClick
             )
 
             when (weatherState) {
@@ -493,7 +507,8 @@ fun AstroMainPage(
             isFromCache = isFromCache,
             cacheAge = viewModel.getCacheAgeString(),
             onHamburger = onHamburger,
-            onSettings = onSettings
+            onSettings = onSettings,
+            onAstroClick = { viewModel.toggleAstroMode() }
         )
         when (weatherState) {
             is UiState.Success -> {
@@ -809,7 +824,9 @@ fun WeatherTopBar(
     isFromCache: Boolean,
     cacheAge: String,
     onHamburger: () -> Unit,
-    onSettings: () -> Unit
+    onSettings: () -> Unit,
+    onAstroClick: (() -> Unit)? = null,
+    onNavigateToLogin: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -855,6 +872,15 @@ fun WeatherTopBar(
             Row {
                 IconButton(onClick = onHamburger) {
                     Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                }
+                if (onAstroClick != null) {
+                    IconButton(onClick = { onAstroClick() }) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = "Astronomy Mode", tint = PurpleLight)
+                    }
+                } else {
+                    IconButton(onClick = onNavigateToLogin) {
+                        Icon(Icons.Default.AccountCircle, contentDescription = "Login", tint = Color.White.copy(alpha = 0.5f))
+                    }
                 }
                 IconButton(onClick = onSettings) {
                     Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)

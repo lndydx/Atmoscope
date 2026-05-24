@@ -21,19 +21,26 @@ import androidx.compose.ui.unit.sp
 import com.example.atmoscope.ui.theme.Purple
 import com.example.atmoscope.ui.theme.PurpleLight
 import com.example.atmoscope.viewmodel.WeatherViewModel
+import com.example.atmoscope.viewmodel.AuthViewModel
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     viewModel: WeatherViewModel,
-    onBack: () -> Unit
+    authViewModel: AuthViewModel,
+    onBack: () -> Unit,
+    onLoggedOut: () -> Unit,
+    onNavigateToLogin: () -> Unit
 ) {
     val isDark by viewModel.isDarkTheme.collectAsState()
     val tempUnit by viewModel.tempUnit.collectAsState()
-    val isAstroMode by viewModel.isAstroMode.collectAsState()
     val isUsingGps by viewModel.isUsingGps.collectAsState()
     val notifEnabled by viewModel.notifEnabled.collectAsState()
     val context = LocalContext.current
+    val currentUser by authViewModel.currentUser.collectAsState()
+    val isLoggedIn = currentUser != null
 
     val bgColor = if (isDark) Color(0xFF0D1117) else Color(0xFFE8EDF5)
     val cardColor = if (isDark) Color(0xFF161B22) else Color.White
@@ -128,43 +135,6 @@ fun SettingsScreen(
                 }
             }
 
-            // Astro Mode
-            SettingCard(cardColor = cardColor) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Visibility,
-                            contentDescription = null,
-                            tint = PurpleLight
-                        )
-                        Column {
-                            Text("Astronomy Mode", fontWeight = FontWeight.Bold, color = textColor)
-                            Text(
-                                if (isAstroMode) "Enabled — Sky Score & Events"
-                                else "Disabled — Weather Mode",
-                                color = subTextColor,
-                                fontSize = 13.sp
-                            )
-                        }
-                    }
-                    Switch(
-                        checked = isAstroMode,
-                        onCheckedChange = { viewModel.toggleAstroMode() },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = Purple
-                        )
-                    )
-                }
-            }
-
             // GPS
             SettingCard(cardColor = cardColor) {
                 Row(
@@ -249,6 +219,110 @@ fun SettingsScreen(
                             checkedTrackColor = Purple
                         )
                     )
+                }
+            }
+
+            // Account
+            SettingCard(cardColor = cardColor) {
+                Text("Astronomy Account", fontWeight = FontWeight.Bold, color = textColor, fontSize = 16.sp)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (isLoggedIn) {
+                    val displayName = currentUser?.displayName?.takeIf { it.isNotBlank() } ?: "Pengguna"
+                    val email = currentUser?.email ?: "-"
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(Purple),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                displayName.take(1).uppercase(),
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                        }
+                        Column {
+                            Text(displayName, fontWeight = FontWeight.Bold, color = textColor, fontSize = 14.sp)
+                            Text(email, color = subTextColor, fontSize = 12.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    var showDeleteDialog by remember { mutableStateOf(false) }
+
+                    OutlinedButton(
+                        onClick = {
+                            authViewModel.logout()
+                            if (viewModel.isAstroMode.value) viewModel.toggleAstroMode()
+                            onLoggedOut()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = PurpleLight),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, PurpleLight.copy(alpha = 0.5f)),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Logout")
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    TextButton(
+                        onClick = { showDeleteDialog = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Hapus Akun", color = Color(0xFFEF4444), fontSize = 13.sp)
+                    }
+
+                    if (showDeleteDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showDeleteDialog = false },
+                            containerColor = cardColor,
+                            title = { Text("Hapus Akun?", color = textColor, fontWeight = FontWeight.Bold) },
+                            text = { Text("Akun kamu akan dihapus permanen.", color = subTextColor) },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    authViewModel.deleteAccount {
+                                        if (viewModel.isAstroMode.value) viewModel.toggleAstroMode()
+                                        onLoggedOut()
+                                    }
+                                    showDeleteDialog = false
+                                }) {
+                                    Text("Hapus", color = Color(0xFFEF4444), fontWeight = FontWeight.Bold)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showDeleteDialog = false }) {
+                                    Text("Batal", color = Purple)
+                                }
+                            }
+                        )
+                    }
+
+                } else {
+                    Text(
+                        "Login untuk akses Astronomy Mode",
+                        color = subTextColor,
+                        fontSize = 13.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = onNavigateToLogin,
+                        colors = ButtonDefaults.buttonColors(containerColor = Purple),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Login / Daftar")
+                    }
                 }
             }
 

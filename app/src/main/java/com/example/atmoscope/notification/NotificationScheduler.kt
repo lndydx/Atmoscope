@@ -10,13 +10,11 @@ object NotificationScheduler {
     private const val WORK_TAG = "atmoscope_weather_notif"
 
     fun schedule(context: Context) {
-        // Hitung delay sampai jam 06.00 besok
         val now = Calendar.getInstance()
         val target = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, 6)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0)
-            // Kalau sudah lewat jam 06.00 hari ini, jadwalkan besok
             if (before(now)) add(Calendar.DAY_OF_MONTH, 1)
         }
 
