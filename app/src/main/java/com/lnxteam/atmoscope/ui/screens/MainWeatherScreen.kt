@@ -36,6 +36,12 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 import com.lnxteam.atmoscope.viewmodel.AuthViewModel
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.lnxteam.atmoscope.viewmodel.AstroViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun MainWeatherScreen(
@@ -88,83 +94,53 @@ fun MainWeatherScreen(
 }
 
 @Composable
-fun WeatherModePager(
+fun MainWeatherScreen(
     viewModel: WeatherViewModel,
-    weatherState: UiState<WeatherBundle>,
-    onHamburger: () -> Unit,
-    onSettings: () -> Unit,
-    onAstroClick: (() -> Unit)?,
-    onNavigateToLogin: () -> Unit,
-    selectedCity: String
+    authViewModel: AuthViewModel,
+    onNavigateToCityManagement: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onNavigateToLogin: () -> Unit
 ) {
-    var currentPage by remember { mutableIntStateOf(0) }
-    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val isAstroMode by viewModel.isAstroMode.collectAsState()
+    val weatherState by viewModel.weatherState.collectAsState()
+    val selectedCity by viewModel.selectedCity.collectAsState()
+    val isDark by viewModel.isDarkTheme.collectAsState()
+    val astroViewModel: AstroViewModel = viewModel()
+
+    val bgGradient = if (isAstroMode) {
+        Brush.verticalGradient(listOf(Color(0xFF000000), Color(0xFF0A0E1A)))
+    } else {
+        getWeatherGradient(weatherState, isDark)
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        when {
-                            dragOffset < -100f && currentPage == 0 -> currentPage = 1
-                            dragOffset > 100f && currentPage == 1 -> currentPage = 0
-                        }
-                        dragOffset = 0f
-                    },
-                    onHorizontalDrag = { _, delta -> dragOffset += delta }
-                )
-            }
+            .background(bgGradient)
     ) {
-        AnimatedContent(
-            targetState = currentPage,
-            transitionSpec = {
-                if (targetState > initialState) {
-                    slideInHorizontally { it } + fadeIn() togetherWith
-                            slideOutHorizontally { -it } + fadeOut()
-                } else {
-                    slideInHorizontally { -it } + fadeIn() togetherWith
-                            slideOutHorizontally { it } + fadeOut()
-                }
-            },
-            label = "weather_pager"
-        ) { page ->
-            when (page) {
-                0 -> WeatherPage(
-                    viewModel = viewModel,
-                    weatherState = weatherState,
-                    onHamburger = onHamburger,
-                    onSettings = onSettings,
-                    onAstroClick = onAstroClick,
-                    onNavigateToLogin = onNavigateToLogin,
-                    selectedCity = selectedCity
-                )
-                1 -> LifeIndexPage(
-                    viewModel = viewModel,
-                    weatherState = weatherState,
-                    onHamburger = onHamburger,
-                    onSettings = onSettings
-                )
-            }
-        }
+        WeatherAnimatedBackground(weatherState, isAstroMode)
 
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 52.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            repeat(2) { index ->
-                Box(
-                    modifier = Modifier
-                        .size(if (index == currentPage) 10.dp else 6.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (index == currentPage) PurpleLight
-                            else Color.White.copy(alpha = 0.3f)
-                        )
-                )
-            }
+        if (isAstroMode) {
+            AstroPage(
+                viewModel = viewModel,
+                astroViewModel = astroViewModel,
+                weatherState = weatherState,
+                onHamburger = onNavigateToCityManagement,
+                onSettings = onNavigateToSettings,
+                selectedCity = selectedCity
+            )
+        } else {
+            WeatherModePager(
+                viewModel = viewModel,
+                weatherState = weatherState,
+                onHamburger = onNavigateToCityManagement,
+                onSettings = onNavigateToSettings,
+                onAstroClick = if (authViewModel.isLoggedIn) {
+                    { viewModel.toggleAstroMode() }
+                } else null,
+                onNavigateToLogin = onNavigateToLogin,
+                selectedCity = selectedCity
+            )
         }
     }
 }
@@ -407,99 +383,26 @@ fun getLifeIndices(current: CurrentWeather): List<LifeIndex> {
 }
 
 // ── ASTRO PAGE ────────────────────────────────────────────
+// ── ASTRO PAGE ────────────────────────────────────────────
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AstroPage(
     viewModel: WeatherViewModel,
+    astroViewModel: AstroViewModel,
     weatherState: UiState<WeatherBundle>,
     onHamburger: () -> Unit,
     onSettings: () -> Unit,
     selectedCity: String
 ) {
-    var astroSubPage by remember { mutableIntStateOf(0) }
-    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val tabs = listOf("Overview", "Events", "APOD", "Planets", "Constellations", "Calculator")
+    val pagerState = rememberPagerState(pageCount = { tabs.size })
+    val scope = rememberCoroutineScope()
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        when {
-                            dragOffset < -100f && astroSubPage == 0 -> astroSubPage = 1
-                            dragOffset > 100f && astroSubPage == 1 -> astroSubPage = 0
-                        }
-                        dragOffset = 0f
-                    },
-                    onHorizontalDrag = { _, delta -> dragOffset += delta }
-                )
-            }
-    ) {
-        AnimatedContent(
-            targetState = astroSubPage,
-            transitionSpec = {
-                if (targetState > initialState) {
-                    slideInHorizontally { it } + fadeIn() togetherWith
-                            slideOutHorizontally { -it } + fadeOut()
-                } else {
-                    slideInHorizontally { -it } + fadeIn() togetherWith
-                            slideOutHorizontally { it } + fadeOut()
-                }
-            },
-            label = "astro_page"
-        ) { subPage ->
-            when (subPage) {
-                0 -> AstroMainPage(
-                    viewModel = viewModel,
-                    weatherState = weatherState,
-                    onHamburger = onHamburger,
-                    onSettings = onSettings,
-                    selectedCity = selectedCity
-                )
-                1 -> AstroEventsPage(
-                    onHamburger = onHamburger,
-                    onSettings = onSettings
-                )
-            }
-        }
+    val isGpsLocation by viewModel.isGpsLocation.collectAsState()
+    val isFromCache by viewModel.isFromCache.collectAsState()
+    val selectedDistrict by viewModel.selectedDistrict.collectAsState()
 
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 24.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            repeat(2) { i ->
-                Box(
-                    modifier = Modifier
-                        .size(if (i == astroSubPage) 10.dp else 6.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (i == astroSubPage) PurpleLight
-                            else Color.White.copy(alpha = 0.3f)
-                        )
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun AstroMainPage(
-    viewModel: WeatherViewModel,
-    weatherState: UiState<WeatherBundle>,
-    onHamburger: () -> Unit,
-    onSettings: () -> Unit,
-    selectedCity: String
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-    ) {
-        val isGpsLocation by viewModel.isGpsLocation.collectAsState()
-        val isFromCache by viewModel.isFromCache.collectAsState()
-        val selectedDistrict by viewModel.selectedDistrict.collectAsState()
-
+    Column(modifier = Modifier.fillMaxSize()) {
         WeatherTopBar(
             city = selectedCity.ifEmpty { "Pilih Kota" },
             district = selectedDistrict,
@@ -510,28 +413,61 @@ fun AstroMainPage(
             onSettings = onSettings,
             onAstroClick = { viewModel.toggleAstroMode() }
         )
+
+        ScrollableTabRow(
+            selectedTabIndex = pagerState.currentPage,
+            containerColor = Color.Transparent,
+            contentColor = PurpleLight,
+            edgePadding = 12.dp
+        ) {
+            tabs.forEachIndexed { index, title ->
+                Tab(
+                    selected = pagerState.currentPage == index,
+                    onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                    text = { Text(title, fontSize = 12.sp) }
+                )
+            }
+        }
+
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            when (page) {
+                0 -> AstroMainPage(viewModel = viewModel, weatherState = weatherState)
+                1 -> AstroEventsPage()
+                2 -> AstroApodPage(astroViewModel)
+                3 -> AstroPlanetPage(astroViewModel)
+                4 -> AstroConstellationPage()
+                5 -> AstroCalculatorPage()
+            }
+        }
+    }
+}
+
+@Composable
+fun AstroMainPage(
+    viewModel: WeatherViewModel,
+    weatherState: UiState<WeatherBundle>
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+    ) {
         when (weatherState) {
             is UiState.Success -> {
                 val forecast = weatherState.data.forecast
                 val aqi = weatherState.data.airQuality.hourly.aqi.firstOrNull { it != null }
                 val skyScore = calculateSkyScore(forecast.current.cloudcover, aqi)
 
-                AstroHero(
-                    skyScore = skyScore,
-                    cloudcover = forecast.current.cloudcover
-                )
-
+                AstroHero(skyScore = skyScore, cloudcover = forecast.current.cloudcover)
                 Spacer(modifier = Modifier.height(16.dp))
                 SectionTitle("Sky Score Forecast")
-                SkyScoreChart(
-                    hourly = forecast.hourly,
-                    airQuality = weatherState.data.airQuality
-                )
-
+                SkyScoreChart(hourly = forecast.hourly, airQuality = weatherState.data.airQuality)
                 Spacer(modifier = Modifier.height(16.dp))
                 SectionTitle("Moon Phase")
                 MoonPhaseCard(skyScore = skyScore)
-
                 Spacer(modifier = Modifier.height(32.dp))
             }
             is UiState.Idle -> IdlePrompt()
@@ -758,7 +694,7 @@ fun MoonPhaseCard(skyScore: Int) {
 }
 
 @Composable
-fun AstroEventsPage(onHamburger: () -> Unit, onSettings: () -> Unit) {
+fun AstroEventsPage() {
     val events = listOf(
         Triple("🌠", "Lyrids Meteor Shower", "21–22 Apr 2026 · ~18 meteor/jam. Bulan sabit tipis, kondisi ideal."),
         Triple("🌠", "Eta Aquariids", "5–6 Mei 2026 · Hingga 50 meteor/jam. Puing dari Komet Halley."),
@@ -776,15 +712,6 @@ fun AstroEventsPage(onHamburger: () -> Unit, onSettings: () -> Unit) {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        WeatherTopBar(
-            city = "Astronomy Events",
-            district = "",
-            isGpsLocation = false,
-            isFromCache = false,
-            cacheAge = "",
-            onHamburger = onHamburger,
-            onSettings = onSettings
-        )
         Spacer(modifier = Modifier.height(8.dp))
         events.chunked(2).forEach { pair ->
             Row(

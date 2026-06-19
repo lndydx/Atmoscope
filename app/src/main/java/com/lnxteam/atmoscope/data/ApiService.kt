@@ -28,7 +28,21 @@ interface AirQualityApi {
     ): AirQualityResponse
 }
 
+interface ApodApi {
+    @GET("planetary/apod")
+    suspend fun getApod(
+        @Query("api_key") apiKey: String
+    ): ApodResponse
+}
+
 object RetrofitInstance {
+    val apodApi: ApodApi by lazy {
+        Retrofit.Builder()
+            .baseUrl("https://api.nasa.gov/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(ApodApi::class.java)
+    }
     val weatherApi: WeatherApi by lazy {
         Retrofit.Builder()
             .baseUrl("https://api.open-meteo.com/")
