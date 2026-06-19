@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.atmoscope"
+    namespace = "com.lnxteam.atmoscope"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.atmoscope"
+        applicationId = "com.lnxteam.atmoscope"
         minSdk = 31
         targetSdk = 36
         versionCode = 1
