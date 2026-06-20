@@ -55,56 +55,6 @@ fun MainWeatherScreen(
     val weatherState by viewModel.weatherState.collectAsState()
     val selectedCity by viewModel.selectedCity.collectAsState()
     val isDark by viewModel.isDarkTheme.collectAsState()
-
-    val bgGradient = if (isAstroMode) {
-        Brush.verticalGradient(listOf(Color(0xFF000000), Color(0xFF0A0E1A)))
-    } else {
-        getWeatherGradient(weatherState, isDark)
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(bgGradient)
-    ) {
-        WeatherAnimatedBackground(weatherState, isAstroMode)
-
-        if (isAstroMode) {
-            AstroPage(
-                viewModel = viewModel,
-                weatherState = weatherState,
-                onHamburger = onNavigateToCityManagement,
-                onSettings = onNavigateToSettings,
-                selectedCity = selectedCity
-            )
-        } else {
-            WeatherModePager(
-                viewModel = viewModel,
-                weatherState = weatherState,
-                onHamburger = onNavigateToCityManagement,
-                onSettings = onNavigateToSettings,
-                onAstroClick = if (authViewModel.isLoggedIn) {
-                    { viewModel.toggleAstroMode() }
-                } else null,
-                onNavigateToLogin = onNavigateToLogin,
-                selectedCity = selectedCity
-            )
-        }
-    }
-}
-
-@Composable
-fun MainWeatherScreen(
-    viewModel: WeatherViewModel,
-    authViewModel: AuthViewModel,
-    onNavigateToCityManagement: () -> Unit,
-    onNavigateToSettings: () -> Unit,
-    onNavigateToLogin: () -> Unit
-) {
-    val isAstroMode by viewModel.isAstroMode.collectAsState()
-    val weatherState by viewModel.weatherState.collectAsState()
-    val selectedCity by viewModel.selectedCity.collectAsState()
-    val isDark by viewModel.isDarkTheme.collectAsState()
     val astroViewModel: AstroViewModel = viewModel()
 
     val bgGradient = if (isAstroMode) {
@@ -130,7 +80,7 @@ fun MainWeatherScreen(
                 selectedCity = selectedCity
             )
         } else {
-            WeatherModePager(
+            WeatherPage(
                 viewModel = viewModel,
                 weatherState = weatherState,
                 onHamburger = onNavigateToCityManagement,

@@ -36,7 +36,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     val isLoggedIn: Boolean get() = auth.currentUser != null
 
-    private val webClientId = "407616959295-r6p26cap22pjd83l62369m9eichqb5ns.apps.googleusercontent.com"
+    private val webClientId = "434646142955-aba4efupkf6i6vmtgdmfuqlf854elelj.apps.googleusercontent.com"
 
     fun loginWithEmail(email: String, password: String) {
         if (email.isBlank() || password.isBlank()) {
