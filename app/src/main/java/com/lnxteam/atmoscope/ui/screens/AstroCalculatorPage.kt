@@ -33,7 +33,7 @@ fun AstroCalculatorPage() {
             .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("📸 Kalkulator Astrofotografi", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 18.sp)
+        Text("Kalkulator Astrofotografi", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 18.sp)
         Text(
             "Aturan 500 — batas shutter speed agar bintang tidak blur",
             color = Color(0xFF8B949E),

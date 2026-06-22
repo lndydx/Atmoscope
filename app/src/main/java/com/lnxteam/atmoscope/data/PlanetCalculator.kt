@@ -69,6 +69,16 @@ object PlanetCalculator {
             w = rev(339.3939 + 2.97661E-5 * d), a = 9.55475,
             e = 0.055546 - 9.499E-9 * d, M = rev(316.9670 + 0.0334442282 * d)
         )
+        "Uranus" -> OrbitalElements(
+            N = rev(74.0005 + 1.3978E-5 * d), i = 0.7733 + 1.9E-8 * d,
+            w = rev(96.6612 + 3.0565E-5 * d), a = 19.18171 - 1.55E-8 * d,
+            e = 0.047318 + 7.45E-9 * d, M = rev(142.5905 + 0.011725806 * d)
+        )
+        "Neptune" -> OrbitalElements(
+            N = rev(131.7806 + 3.0173E-5 * d), i = 1.7700 - 2.55E-7 * d,
+            w = rev(272.8461 - 6.027E-6 * d), a = 30.05826 + 3.313E-8 * d,
+            e = 0.008606 + 2.15E-9 * d, M = rev(260.2471 + 0.005995147 * d)
+        )
         else -> throw IllegalArgumentException("Unknown planet")
     }
 
@@ -147,10 +157,12 @@ object PlanetCalculator {
 
         val planets = listOf(
             Triple("Mercury", "☿️", "Merkurius"),
-            Triple("Venus", "♀️", "Venus"),
-            Triple("Mars", "♂️", "Mars"),
+            Triple("Venus", "♀", "Venus"),
+            Triple("Mars", "♂", "Mars"),
             Triple("Jupiter", "♃", "Jupiter"),
-            Triple("Saturn", "♄", "Saturnus")
+            Triple("Saturn", "♄", "Saturnus"),
+            Triple("Uranus", "♅", "Uranus"),
+            Triple("Neptune", "♆", "Neptunus")
         )
 
         return planets.map { (key, emoji, label) ->
@@ -159,7 +171,9 @@ object PlanetCalculator {
             val (ra, dec) = toEquatorial(xh + xs, yh + ys, zh + zs, ecl)
             val (alt, az) = altAz(ra, dec, lst, lat)
             val visible = alt > 0 && isNight
+            val needsTelescope = key == "Uranus" || key == "Neptune"
             val desc = when {
+                visible && needsTelescope -> "Posisinya di atas ufuk, tapi butuh teropong/teleskop untuk melihatnya"
                 visible -> "Terlihat di langit, ketinggian ${alt.roundToInt()}° dari ufuk"
                 alt > 0 && !isNight -> "Di atas ufuk, tapi langit masih terang"
                 else -> "Di bawah ufuk, belum bisa diamati"

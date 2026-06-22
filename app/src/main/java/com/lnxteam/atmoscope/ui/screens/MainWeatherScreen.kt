@@ -80,7 +80,7 @@ fun MainWeatherScreen(
                 selectedCity = selectedCity
             )
         } else {
-            WeatherPage(
+            WeatherModePager(
                 viewModel = viewModel,
                 weatherState = weatherState,
                 onHamburger = onNavigateToCityManagement,
@@ -91,6 +91,89 @@ fun MainWeatherScreen(
                 onNavigateToLogin = onNavigateToLogin,
                 selectedCity = selectedCity
             )
+        }
+    }
+}
+
+@Composable
+fun WeatherModePager(
+    viewModel: WeatherViewModel,
+    weatherState: UiState<WeatherBundle>,
+    onHamburger: () -> Unit,
+    onSettings: () -> Unit,
+    onAstroClick: (() -> Unit)?,
+    onNavigateToLogin: () -> Unit,
+    selectedCity: String
+) {
+    var currentPage by remember { mutableIntStateOf(0) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        when {
+                            dragOffset < -100f && currentPage == 0 -> currentPage = 1
+                            dragOffset > 100f && currentPage == 1 -> currentPage = 0
+                        }
+                        dragOffset = 0f
+                    },
+                    onHorizontalDrag = { _, delta -> dragOffset += delta }
+                )
+            }
+    ) {
+        AnimatedContent(
+            targetState = currentPage,
+            transitionSpec = {
+                if (targetState > initialState) {
+                    slideInHorizontally { it } + fadeIn() togetherWith
+                            slideOutHorizontally { -it } + fadeOut()
+                } else {
+                    slideInHorizontally { -it } + fadeIn() togetherWith
+                            slideOutHorizontally { it } + fadeOut()
+                }
+            },
+            label = "weather_pager"
+        ) { page ->
+            when (page) {
+                0 -> WeatherPage(
+                    viewModel = viewModel,
+                    weatherState = weatherState,
+                    onHamburger = onHamburger,
+                    onSettings = onSettings,
+                    onAstroClick = onAstroClick,
+                    onNavigateToLogin = onNavigateToLogin,
+                    selectedCity = selectedCity
+                )
+                1 -> LifeIndexPage(
+                    viewModel = viewModel,
+                    weatherState = weatherState,
+                    onHamburger = onHamburger,
+                    onSettings = onSettings,
+                    onAstroClick = onAstroClick
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 52.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            repeat(2) { index ->
+                Box(
+                    modifier = Modifier
+                        .size(if (index == currentPage) 10.dp else 6.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (index == currentPage) PurpleLight
+                            else Color.White.copy(alpha = 0.3f)
+                        )
+                )
+            }
         }
     }
 }
@@ -193,7 +276,8 @@ fun LifeIndexPage(
     viewModel: WeatherViewModel,
     weatherState: UiState<WeatherBundle>,
     onHamburger: () -> Unit,
-    onSettings: () -> Unit
+    onSettings: () -> Unit,
+    onAstroClick: (() -> Unit)?
 ) {
     Column(
         modifier = Modifier
@@ -207,7 +291,8 @@ fun LifeIndexPage(
             isFromCache = false,
             cacheAge = "",
             onHamburger = onHamburger,
-            onSettings = onSettings
+            onSettings = onSettings,
+            onAstroClick = onAstroClick
         )
         when (weatherState) {
             is UiState.Success -> {
@@ -332,7 +417,6 @@ fun getLifeIndices(current: CurrentWeather): List<LifeIndex> {
     )
 }
 
-// ── ASTRO PAGE ────────────────────────────────────────────
 // ── ASTRO PAGE ────────────────────────────────────────────
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -974,7 +1058,7 @@ fun IdlePrompt() {
 }
 
 @Composable
-fun LoadingIndicator() {
+fun LoadingIndicator(message: String = "Mengambil data cuaca...") {
     Box(
         modifier = Modifier.fillMaxWidth().padding(48.dp),
         contentAlignment = Alignment.Center
@@ -982,7 +1066,7 @@ fun LoadingIndicator() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator(color = PurpleLight)
             Spacer(modifier = Modifier.height(12.dp))
-            Text("Mengambil data cuaca...", color = Color.White.copy(alpha = 0.6f))
+            Text(message, color = Color.White.copy(alpha = 0.6f))
         }
     }
 }

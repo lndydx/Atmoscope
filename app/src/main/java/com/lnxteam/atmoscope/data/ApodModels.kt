@@ -9,8 +9,8 @@ data class ApodResponse(
     val url: String?,
     @SerializedName("hdurl") val hdUrl: String?,
     @SerializedName("media_type") val mediaType: String
-)
 
+)
 object NasaConfig {
-    const val API_KEY = ""
+    const val API_KEY = "O4eAYePgXR3NRRFH6fiWnsHkiZDrYvb2rtnL5hBS"
 }

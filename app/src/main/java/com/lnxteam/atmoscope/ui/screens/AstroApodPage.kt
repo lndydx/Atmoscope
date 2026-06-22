@@ -36,7 +36,7 @@ fun AstroApodPage(astroViewModel: AstroViewModel) {
             .padding(16.dp)
     ) {
         when (val state = apodState) {
-            is UiState.Loading, is UiState.Idle -> LoadingIndicator()
+            is UiState.Loading, is UiState.Idle -> LoadingIndicator("Memuat foto hari ini")
             is UiState.Error -> ErrorCard(state.message)
             is UiState.Success -> {
                 val apod = state.data
